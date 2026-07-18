@@ -395,7 +395,7 @@
       ${filterbarHTML()}
       ${summaryHTML()}
       ${state.view==="kanban"?kanbanHTML():calendarHTML()}
-      <div class="storage-note">${isAdmin()?"Ви адміністратор: можете створювати й редагувати задачі.":"Режим перегляду. Редагувати може лише адміністратор дошки."} Кожна зміна фіксується в журналі. ${remoteOn()?(remoteOk?"<b style=\"color:#5c7a2e\">Спільна таблиця підключена</b> — усі бачать однакові картки.":"<b style=\"color:#C1503D\">Немає зв'язку з таблицею</b> — "+remoteError+". Зміни збережено лише на цьому пристрої."):"<b>Локальний режим</b> — картки зберігаються лише в цьому браузері. Щоб дошка стала спільною, підключіть Google-таблицю в налаштуваннях."}</div>
+      <div class="storage-note">${isAdmin()?(isMaster()?"Ви ведете цю дошку як викладач.":"Ви капітан команди: можете створювати й редагувати картки."):"Режим перегляду. Вести дошку можуть викладач і капітан команди."} Кожна зміна фіксується в журналі. ${remoteOn()?(remoteOk?"<b style=\"color:#5c7a2e\">Спільна таблиця підключена</b> — усі бачать однакові картки.":"<b style=\"color:#C1503D\">Немає зв'язку з таблицею</b> — "+remoteError+". Зміни збережено лише на цьому пристрої."):"<b>Локальний режим</b> — картки зберігаються лише в цьому браузері. Щоб дошка стала спільною, підключіть Google-таблицю в налаштуваннях."}</div>
     `;
     bindEvents();
     if(state.modal){
@@ -412,7 +412,7 @@
     const sel=state.selectedSprint;
     const admin=isAdmin();
     const chip = state.identity
-      ? `<div class="whoami" data-whoami title="Профіль / вийти"><span class="avatar">${initials(state.identity)}</span>${state.identity}<span class="role-tag admin">${isMaster()?'головний':'адмін'}</span></div>`
+      ? `<div class="whoami" data-whoami title="Профіль / вийти"><span class="avatar">${initials(state.identity)}</span>${state.identity}<span class="role-tag admin">${isMaster()?'викладач':'капітан'}</span></div>`
       : `<div class="whoami guest" data-whoami title="Увійти за паролем"><span class="avatar">?</span>Увійти</div>`;
     return `
       <div class="topbar">
@@ -429,7 +429,7 @@
           </select>
         </div>
         <button class="icon-btn" data-log>Історія</button>
-        ${admin?`<button class="icon-btn" data-settings title="Налаштування">⚙ Налаштування</button>`:""}
+        ${isMaster()?`<button class="icon-btn" data-settings title="Налаштування">⚙ Налаштування</button>`:""}
         ${chip}
       </div>`;
   }
@@ -536,8 +536,8 @@
     if(!state.creds.length){
       o.innerHTML=`
         <div class="modal">
-          <h3>Створення головного адміністратора</h3>
-          <p style="font-size:12.5px;color:var(--grey);margin:0 0 14px 0;">Це перше налаштування дошки. Створіть головного адміністратора — ваше ім'я та пароль. Далі ви зможете видавати паролі іншим адміністраторам.</p>
+          <h3>Хто веде цю дошку</h3>
+          <p style="font-size:12.5px;color:var(--grey);margin:0 0 14px 0;">Це перше налаштування дошки. Вкажіть своє ім'я та пароль викладача. Далі ви зможете видати пароль капітанові команди.</p>
           <div class="field-label">Ваше ім'я</div>
           <input type="text" id="f-master-name" placeholder="Напр.: Тетяна Гаренко" value="${state.people[0]||''}">
           <div class="field-label">Пароль</div>
@@ -575,8 +575,8 @@
     // Not logged in -> password entry
     o.innerHTML=`
       <div class="modal">
-        <h3>Вхід для адміністратора</h3>
-        <p style="font-size:12.5px;color:var(--grey);margin:0 0 14px 0;">Введіть пароль, який видав головний адміністратор. Без пароля дошка доступна лише для перегляду.</p>
+        <h3>Вхід</h3>
+        <p style="font-size:12.5px;color:var(--grey);margin:0 0 14px 0;">Введіть пароль викладача або капітана команди. Без пароля дошка доступна лише для перегляду.</p>
         <div class="field-label">Пароль</div>
         <input type="text" id="f-login-pass" placeholder="Ваш пароль" autofocus>
         <div id="login-warn"></div>
@@ -656,8 +656,8 @@
         </div>
 
         <div class="set-section">
-          <div class="set-h">Доступи адміністраторів</div>
-          <p style="font-size:11.5px;color:var(--grey);margin:0 0 8px 0;">${isMaster()?'Видайте пароль людині, якій потрібне право редагування. Пароль показується один раз — одразу скопіюйте й передайте особисто.':'Керувати доступами може лише головний адміністратор.'}</p>
+          <div class="set-h">Капітан команди</div>
+          <p style="font-size:11.5px;color:var(--grey);margin:0 0 8px 0;">${isMaster()?'Видайте пароль капітанові команди — він зможе вести дошку: додавати картки, пересувати їх, відмічати виконане. Пароль показується один раз, одразу передайте його особисто.':'Керувати доступами може лише викладач.'}</p>
           ${isMaster() && state.revealPass ? `<div class="inline-warn" style="display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--green-soft);color:#2F4A2F;">
             <span>Пароль для <b>${state.revealPass.name}</b>: <code style="font-size:13px;letter-spacing:1px;background:#fff;padding:2px 8px;border-radius:5px;">${state.revealPass.pass}</code></span>
             <button class="icon-btn" data-copy-pass style="padding:4px 8px;">Копіювати</button>
@@ -671,9 +671,9 @@
               </div>`).join("")}
           </div>
           ${isMaster()?`
-          <div class="field-label">Видати доступ новій людині</div>
+          <div class="field-label">Видати доступ капітанові</div>
           <div style="display:flex;gap:8px;align-items:flex-start;">
-            <input type="text" id="f-cred-name" placeholder="Ім'я людини" style="flex:1;" list="people-datalist">
+            <input type="text" id="f-cred-name" placeholder="Ім'я капітана" style="flex:1;" list="people-datalist">
             <input type="text" id="f-cred-pass" placeholder="Пароль" style="width:120px;">
             <button class="icon-btn" data-gen-pass title="Згенерувати" style="padding:8px 10px;">🎲</button>
           </div>
@@ -848,7 +848,7 @@
         ${cl.length?`<div class="field-label">Чекліст (${cl.filter(i=>i.done).length}/${cl.length})</div><div class="view-checklist">${cl.map(i=>`<div class="vc-row ${i.done?'done':''}"><input type="checkbox" ${i.done?'checked':''} ${admin?'':'disabled'} data-vc="${i.id}"><span>${i.text}</span></div>`).join("")}</div>`:""}
         ${t.updatedAt?`<div class="audit-line">Останнє редагування: <b>${t.updatedBy||"?"}</b>, ${fmtDateTime(t.updatedAt)}</div>`:""}
         ${!admin && !state.identity ? `<div class="inline-warn" style="margin-top:12px;">Щоб редагувати, увійдіть як адміністратор.</div>` : ""}
-        ${!admin && state.identity ? `<div class="audit-line">Редагувати задачі можуть лише адміністратори з паролем.</div>` : ""}
+        ${!admin && state.identity ? `<div class="audit-line">Редагувати картки можуть викладач і капітан команди.</div>` : ""}
         <div class="modal-actions">
           ${admin?`<button class="btn danger" data-delete>Видалити</button>`:`<div></div>`}
           <div style="display:flex; gap:8px;">
