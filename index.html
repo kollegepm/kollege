@@ -152,6 +152,37 @@
     if(remoteOn()&&state.isAdmin) remoteSet(SUB_KEY,state.subjects);
   }
 
+  // Перетворює українську назву на латиницю для позначки дошки
+  const TR={"а":"a","б":"b","в":"v","г":"h","ґ":"g","д":"d","е":"e","є":"ie","ж":"zh","з":"z",
+    "и":"y","і":"i","ї":"i","й":"i","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r",
+    "с":"s","т":"t","у":"u","ф":"f","х":"kh","ц":"ts","ч":"ch","ш":"sh","щ":"shch","ь":"",
+    "ю":"iu","я":"ia","'":"","’":"","`":""};
+  function translit(str){
+    return String(str||"").toLowerCase().split("").map(ch=>{
+      if(TR.hasOwnProperty(ch)) return TR[ch];
+      if(/[a-z0-9]/.test(ch)) return ch;
+      return "_";
+    }).join("").replace(/_+/g,"_").replace(/^_|_$/g,"").slice(0,24) || "board";
+  }
+  // Збирає всі вже зайняті позначки дощок
+  function usedBoardIds(){
+    const ids=new Set();
+    state.subjects.forEach(s=>(s.links||[]).forEach(l=>{
+      const m=String(l.url||"").match(/[?&]board=([a-zA-Z0-9_-]+)/);
+      if(m) ids.add(m[1]);
+    }));
+    return ids;
+  }
+  // Готове посилання на нову дошку предмета
+  function makeBoardUrl(subjectName){
+    let base=translit(subjectName), id=base, n=2;
+    const used=usedBoardIds();
+    while(used.has(id)){ id=base+"_"+n; n++; }
+    let u="task_board.html?board="+id+"&title="+encodeURIComponent(subjectName);
+    if(SHEET_URL) u+="&sheet="+SHEET_URL;
+    return u;
+  }
+
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
   function safeUrl(u){
     u=String(u||"").trim();
@@ -186,7 +217,8 @@
       </div>
       ${rows}
       ${state.edit?`<div class="tile-actions">
-        <button class="btn small primary" data-addlink="${s.id}">+ Посилання</button>
+        <button class="btn small primary" data-newboard="${s.id}">+ Нова дошка</button>
+        <button class="btn small" data-addlink="${s.id}">Інше посилання</button>
         <button class="btn small" data-renamesub="${s.id}">Перейменувати</button>
         <button class="btn small danger" data-delsub="${s.id}">Видалити</button>
       </div>`:""}
@@ -281,14 +313,22 @@
       const sub=state.subjects.find(s=>s.id===m.subId); if(!sub){ closeModal(); return; }
       const link=m.linkId?(sub.links||[]).find(l=>l.id===m.linkId):null;
       o.innerHTML=`<div class="modal">
-        <h3>${link?"Редагувати посилання":"Нове посилання"} · ${esc(sub.name)}</h3>
-        <div class="field-label">Назва (що це за дошка)</div>
-        <input type="text" id="l-title" placeholder="Напр.: Канбан групи М-21" value="${esc(link?link.title:"")}">
-        <div class="field-label">Посилання або назва файлу</div>
-        <input type="text" id="l-url" placeholder="https://… або kanban_math.html" value="${esc(link?link.url:"")}">
-        <div class="note">Якщо всі файли лежать поруч із цією сторінкою, достатньо написати назву файлу, наприклад <b>kanban_math.html</b>. Якщо дошка в іншому сервісі — вставте повне посилання.</div>
+        <h3>Інше посилання · ${esc(sub.name)}</h3>
+        <div class="note">Це для матеріалів поза нашими дошками: тека з файлами, курс, зовнішній сервіс. Щоб створити звичайну дошку, скористайтесь кнопкою «Нова дошка».</div>
+        <div class="field-label">Назва (що побачить студент)</div>
+        <input type="text" id="l-title" placeholder="Напр.: Матеріали курсу" value="">
+        <div class="field-label">Посилання</div>
+        <input type="text" id="l-url" placeholder="https://… або eduscrum_course.html" value="">
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button class="btn small" data-gen-course>Курс для викладачів</button>
+        </div>
         <div class="modal-actions"><button class="btn" data-cancel>Скасувати</button><button class="btn primary" data-savelink>Зберегти</button></div>
       </div>`;
+      o.querySelector("[data-gen-course]").addEventListener("click",()=>{
+        document.getElementById("l-url").value="eduscrum_course.html";
+        const t=document.getElementById("l-title");
+        if(!t.value.trim()) t.value="Курс для викладачів";
+      });
       o.querySelector("[data-cancel]").addEventListener("click",closeModal);
       o.querySelector("[data-savelink]").addEventListener("click",()=>{
         const t=document.getElementById("l-title").value.trim();
@@ -346,15 +386,31 @@
     const as=root.querySelector("[data-addsub]");
     if(as) as.addEventListener("click",()=>{
       const n=prompt("Назва предмета:"); if(!n||!n.trim()) return;
-      state.subjects.push({id:nid(),name:n.trim(),links:[]}); persist(); render();
+      const sub={id:nid(),name:n.trim(),links:[{id:nid(),title:"Канбан",url:makeBoardUrl(n.trim())}]};
+      state.subjects.push(sub); persist(); render();
     });
 
+    root.querySelectorAll("[data-newboard]").forEach(b=>b.addEventListener("click",()=>{
+      const sub=state.subjects.find(x=>x.id===b.dataset.newboard); if(!sub) return;
+      const has=(sub.links||[]).length;
+      const suggest=has?("Група "+(has+1)):"Канбан";
+      const nm=prompt("Назва дошки (наприклад, назва групи):",suggest);
+      if(nm===null) return;
+      const title=(nm.trim()||suggest);
+      if(!sub.links) sub.links=[];
+      sub.links.push({id:nid(),title,url:makeBoardUrl(sub.name+(has?" "+title:""))});
+      persist(); render();
+    }));
     root.querySelectorAll("[data-addlink]").forEach(b=>b.addEventListener("click",()=>{
-      state.modal={mode:"link",subId:b.dataset.addlink}; render();
+      state.modal={mode:"link",subId:b.dataset.addlink,external:true}; render();
     }));
     root.querySelectorAll("[data-editlink]").forEach(b=>b.addEventListener("click",()=>{
       const [subId,linkId]=b.dataset.editlink.split(":");
-      state.modal={mode:"link",subId,linkId}; render();
+      const sub=state.subjects.find(x=>x.id===subId); if(!sub) return;
+      const link=(sub.links||[]).find(l=>l.id===linkId); if(!link) return;
+      const nm=prompt("Нова назва дошки:",link.title);
+      if(nm===null||!nm.trim()) return;
+      link.title=nm.trim(); persist(); render();
     }));
     root.querySelectorAll("[data-dellink]").forEach(b=>b.addEventListener("click",()=>{
       const [subId,linkId]=b.dataset.dellink.split(":");

@@ -143,8 +143,20 @@
 
 <script>
 (function(){
-  const TASKS_KEY="admin-board:tasks", PEOPLE_KEY="admin-board:people", SPRINTS_KEY="admin-board:sprints",
-        LOG_KEY="admin-board:log", IDENTITY_KEY="admin-board:identity", CREDS_KEY="admin-board:creds";
+  // Кожна дошка має власний простір даних. Він задається в посиланні: ?board=math
+  // Завдяки цьому одна Google-таблиця обслуговує дошки всіх предметів окремо.
+  let BOARD_ID="admin-board";
+  try{
+    const b=new URLSearchParams(location.search).get("board");
+    if(b && /^[a-zA-Z0-9_-]{1,32}$/.test(b)) BOARD_ID=b.trim();
+  }catch(e){}
+  let BOARD_TITLE="";
+  try{
+    const t=new URLSearchParams(location.search).get("title");
+    if(t) BOARD_TITLE=decodeURIComponent(t).slice(0,40).replace(/[<>]/g,"");
+  }catch(e){}
+  const TASKS_KEY=BOARD_ID+":tasks", PEOPLE_KEY=BOARD_ID+":people", SPRINTS_KEY=BOARD_ID+":sprints",
+        LOG_KEY=BOARD_ID+":log", IDENTITY_KEY=BOARD_ID+":identity", CREDS_KEY=BOARD_ID+":creds";
   const DEFAULT_PEOPLE = ["Тетяна Гаренко", "Ольга Петренко", "Марія Коваленко"];
 
   const COLUMNS = [
@@ -405,7 +417,7 @@
     return `
       <div class="topbar">
         <div class="logo-plate"><img src="data:image/png;base64,${LOGO_B64}" alt="Логотип коледжу"></div>
-        <div class="topbar-title" style="margin-right:auto;">ДОШКА ЗАДАЧ</div>
+        <div class="topbar-title" style="margin-right:auto;">ДОШКА ЗАДАЧ${BOARD_TITLE?` <span style="font-weight:400;color:var(--orange);">· ${BOARD_TITLE}</span>`:""}</div>
         <div class="view-switch">
           <button class="view-btn ${state.view==='kanban'?'active':''}" data-view="kanban">Канбан</button>
           <button class="view-btn ${state.view==='calendar'?'active':''}" data-view="calendar">Календар</button>
