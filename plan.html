@@ -1157,6 +1157,7 @@
           ${admin?`<button class="btn danger" data-delete>Видалити</button>`:`<div></div>`}
           <div style="display:flex; gap:8px;">
             <button class="btn ghost" data-cancel>Закрити</button>
+            ${admin?`<button class="btn ghost" data-duplicate>Копіювати</button>`:""}
             ${admin?`<button class="btn accent" data-edit>Редагувати</button>`:""}
             ${!admin && !state.identity?`<button class="btn accent" data-login>Увійти, щоб редагувати</button>`:""}
           </div>
@@ -1166,7 +1167,22 @@
     o.querySelector("[data-cancel]").addEventListener("click",closeModal);
     const eb=o.querySelector("[data-edit]"); if(eb) eb.addEventListener("click",()=>openEditModal(t.id));
     const lb=o.querySelector("[data-login]"); if(lb) lb.addEventListener("click",()=>{ state.modal={mode:'identity'}; render(); });
-    const db=o.querySelector("[data-delete]"); if(db) db.addEventListener("click",()=>{ if(confirm(`Видалити задачу «${t.title}»?`)){ state.tasks=state.tasks.filter(x=>x.id!==t.id); persistTasks(); logAction("видалив(-ла) задачу",t.title); closeModal(); render(); } });
+    const cp=o.querySelector("[data-duplicate]"); if(cp) cp.addEventListener("click",()=>{
+      const src=state.tasks.find(x=>x.id===t.id); if(!src) return;
+      const copy=JSON.parse(JSON.stringify(src));
+      copy.id=uid();
+      copy.title=src.title+" (копія)";
+      copy.status="backlog";
+      copy.completedAt=null; copy.updatedAt=null; copy.updatedBy=null;
+      if(Array.isArray(copy.checklist)) copy.checklist=copy.checklist.map(i=>({...i,done:false}));
+      // вставляємо одразу після оригіналу
+      const idx=state.tasks.findIndex(x=>x.id===t.id);
+      state.tasks.splice(idx+1,0,copy);
+      persistTasks(); logAction("скопіював(-ла) задачу",src.title);
+      closeModal(); render();
+      if(typeof toast==="function") toast("Картку скопійовано в беклог");
+    });
+        const db=o.querySelector("[data-delete]"); if(db) db.addEventListener("click",()=>{ if(confirm(`Видалити задачу «${t.title}»?`)){ state.tasks=state.tasks.filter(x=>x.id!==t.id); persistTasks(); logAction("видалив(-ла) задачу",t.title); closeModal(); render(); } });
     if(admin) o.querySelectorAll("[data-vc]").forEach(cb=>cb.addEventListener("change",()=>{
       const real=state.tasks.find(x=>x.id===t.id); if(!real) return;
       const it=real.checklist.find(i=>i.id===cb.dataset.vc); if(it) it.done=cb.checked;
